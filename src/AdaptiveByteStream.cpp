@@ -9,11 +9,14 @@
 #include "AdaptiveByteStream.h"
 
 #include "common/AdaptiveStream.h"
+#include "utils/log.h"
 
 // AP4_ByteStream methods
 AP4_Result CAdaptiveByteStream::ReadPartial(void* buffer, AP4_Size bytesToRead, AP4_Size& bytesRead)
 {
   bytesRead = m_adStream->read(buffer, bytesToRead);
+  if (bytesRead == 0)
+    LOG::Log(LOGINFO, "[ISAAUD] ReadPartial FAILED: requested=%u bytesRead=0 -> AP4_ERROR_READ_FAILED", bytesToRead);
   return bytesRead > 0 ? AP4_SUCCESS : AP4_ERROR_READ_FAILED;
 }
 
@@ -34,6 +37,8 @@ AP4_Result CAdaptiveByteStream::Seek(AP4_Position position)
 {
   bool isEos{false};
   const bool ret = m_adStream->seek(position, isEos);
+  if (!ret)
+    LOG::Log(LOGINFO, "[ISAAUD] Seek FAILED: pos=%llu isEos=%d", position, isEos);
   return ret ? AP4_SUCCESS : isEos ? AP4_ERROR_EOS : AP4_ERROR_NOT_SUPPORTED;
 }
 

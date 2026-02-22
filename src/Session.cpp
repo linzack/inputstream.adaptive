@@ -891,6 +891,11 @@ bool SESSION::CSession::GetNextSample(ISampleReader*& sampleReader)
           }
         }
       }
+      else
+      {
+        LOG::Log(LOGINFO, "[ISAAUD] GetNextSample SKIP: sid=%d EOS=true",
+                 streamReader->GetStreamId());
+      }
     }
   }
 

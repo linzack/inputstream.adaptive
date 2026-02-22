@@ -1009,6 +1009,11 @@ uint32_t adaptive::AdaptiveStream::read(void* buffer, uint32_t bytesToRead)
       currSegBuffer.CopyBufferTo(buffer, segment_read_pos_ - avail, avail);
       return static_cast<uint32_t>(avail);
     }
+    else if (avail > 0)
+    {
+      LOG::Log(LOGINFO, "[ISAAUD] [AS-%u] Partial read DISCARDED: avail=%zu requested=%u segPos=%zu bufSize=%zu",
+               clsId, avail, bytesToRead, segment_read_pos_, currSegBuffer.BufferSize());
+    }
   }
 
   return 0;

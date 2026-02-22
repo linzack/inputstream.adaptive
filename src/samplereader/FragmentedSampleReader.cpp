@@ -169,6 +169,9 @@ AP4_Result CFragmentedSampleReader::ReadSample()
   {
     if (AP4_FAILED(result = m_lReader->ExecReadNextSample(this, m_track->GetId(), m_sample, sampleData)))
     {
+      LOG::Log(LOGINFO, "[ISAAUD] ReadSample ExecReadNextSample FAILED: trackId=%u result=%d (EOS=%d)",
+               m_track->GetId(), result, (result == AP4_ERROR_EOS) ? 1 : 0);
+
       m_sampleData.SetDataSize(0);
 
       if (result == AP4_ERROR_EOS)
@@ -177,12 +180,18 @@ AP4_Result CFragmentedSampleReader::ReadSample()
         if (!adByteStream)
         {
           LOG::LogF(LOGERROR, "Fragment stream cannot be casted to AdaptiveByteStream");
+          LOG::Log(LOGINFO, "[ISAAUD] ReadSample -> m_eos=TRUE trackId=%u (adByteStream cast failed)",
+                   m_track->GetId());
           m_eos = true;
         }
         else
         {
           if (!adByteStream->waitingForSegment())
+          {
+            LOG::Log(LOGINFO, "[ISAAUD] ReadSample -> m_eos=TRUE trackId=%u (not waitingForSegment, VOD)",
+                     m_track->GetId());
             m_eos = true;
+          }
         }
       }
       return result;

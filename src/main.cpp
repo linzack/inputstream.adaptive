@@ -324,6 +324,8 @@ DEMUX_PACKET* CInputStreamAdaptive::DemuxRead(void)
     if (m_session->CheckChange())
     {
       // Adaptive stream has switched stream (representation) quality
+      LOG::Log(LOGINFO, "[ISAAUD] DemuxRead CheckChange early return, sr=%s srStreamId=%d",
+               sr ? "set" : "null", sr ? sr->GetStreamId() : -1);
       m_lastPts = PLAYLIST::NO_PTS_VALUE;
       p = AllocateDemuxPacket(0);
       p->iStreamId = DEMUX_SPECIALID_STREAMCHANGE;
