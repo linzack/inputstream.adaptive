@@ -310,14 +310,22 @@ bool CFragmentedSampleReader::TimeSeek(uint64_t pts)
   AP4_Ordinal sampleIndex;
   AP4_UI64 seekPos(static_cast<AP4_UI64>((pts * m_timeBaseInt) / m_timeBaseExt));
 
+  LOG::Log(LOGINFO, "[ISASEEK] FMP4::TimeSeek trackId=%u pts=%llu seekPos=%llu tbInt=%llu tbExt=%llu",
+           m_track->GetId(), pts, seekPos, m_timeBaseInt, m_timeBaseExt);
+
   AP4_Result result = m_lReader->SeekSample(m_track->GetId(), seekPos, sampleIndex);
   if (AP4_FAILED(result))
   {
+    LOG::Log(LOGINFO, "[ISASEEK] FMP4::TimeSeek trackId=%u SeekSample FAIL result=%d",
+             m_track->GetId(), result);
     if (result != AP4_ERROR_EOS)
       LOG::LogF(LOGERROR, "Cannot seek track id %u, error %i", m_track->GetId(), result);
 
     return false;
   }
+
+  LOG::Log(LOGINFO, "[ISASEEK] FMP4::TimeSeek trackId=%u SeekSample OK sampleIdx=%u",
+           m_track->GetId(), sampleIndex);
 
   if (m_decrypter)
     m_decrypter->SetSampleIndex(sampleIndex);
@@ -326,7 +334,10 @@ bool CFragmentedSampleReader::TimeSeek(uint64_t pts)
     m_codecHandler->TimeSeek(seekPos);
 
   m_started = true;
-  return AP4_SUCCEEDED(ReadSample());
+  AP4_Result readResult = ReadSample();
+  LOG::Log(LOGINFO, "[ISASEEK] FMP4::TimeSeek trackId=%u ReadSample result=%d dts=%llu pts=%llu",
+           m_track->GetId(), readResult, m_dts, m_pts);
+  return AP4_SUCCEEDED(readResult);
 }
 
 void CFragmentedSampleReader::SetPTSOffset(uint64_t offset)

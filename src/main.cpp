@@ -440,12 +440,18 @@ bool CInputStreamAdaptive::PosTime(int ms)
     return false;
 
   LOG::Log(LOGINFO, "PosTime (%d)", ms);
+  LOG::Log(LOGINFO, "[ISASEEK] PosTime entry ms=%d streamCount=%u", ms, m_session->GetStreamCount());
 
   const uint64_t currentTimeMs = m_session->GetElapsedTimeMs();
   bool isError{false};
 
   if (m_session->SeekTime(static_cast<double>(ms) * 0.001f, isError))
+  {
+    LOG::Log(LOGINFO, "[ISASEEK] PosTime(%d) returning TRUE (seek succeeded)", ms);
     return true;
+  }
+
+  LOG::Log(LOGINFO, "[ISASEEK] PosTime(%d) SeekTime returned false isError=%d", ms, isError);
 
   if (!isError)
   {

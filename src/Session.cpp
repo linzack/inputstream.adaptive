@@ -913,8 +913,14 @@ bool SESSION::CSession::GetNextSample(ISampleReader*& sampleReader)
 
 bool SESSION::CSession::SeekTime(double seekTime, bool& isError)
 {
+  LOG::Log(LOGINFO, "[ISASEEK] SeekTime entry seekTime=%0.3lf streams=%zu timingStream=%s",
+           seekTime, m_streams.size(), m_timingStream ? "yes" : "no");
+
   if (m_streams.empty())
+  {
+    LOG::Log(LOGINFO, "[ISASEEK] SeekTime exit FAIL: no streams");
     return false;
+  }
 
   //we don't have pts < 0 here and work internally with uint64
   if (seekTime < 0)
@@ -999,6 +1005,7 @@ bool SESSION::CSession::SeekTime(double seekTime, bool& isError)
     if (!timingReader)
     {
       LOG::LogF(LOGERROR, "Cannot get the stream sample reader of timing stream");
+      LOG::Log(LOGINFO, "[ISASEEK] SeekTime exit FAIL: timing reader null");
       return false;
     }
 
@@ -1008,8 +1015,12 @@ bool SESSION::CSession::SeekTime(double seekTime, bool& isError)
 
     const double seekSecs = static_cast<double>(seekTimeCorrected) / STREAM_TIME_BASE;
 
+    LOG::Log(LOGINFO, "[ISASEEK] TimingStream seekTimeCorrected=%llu absOffset=%llu seekSecs=%0.3f",
+             seekTimeCorrected, m_timingStream->m_adStream.GetAbsolutePTSOffset(), seekSecs);
+
     if (!SeekAdStream(*m_timingStream, seekSecs))
     {
+      LOG::Log(LOGINFO, "[ISASEEK] SeekTime exit FAIL: timing SeekAdStream failed");
       isError = true;
       return false;
     }
@@ -1021,10 +1032,15 @@ bool SESSION::CSession::SeekTime(double seekTime, bool& isError)
 
     ptsDiff = timingReader->GetPTSDiff();
 
+    LOG::Log(LOGINFO, "[ISASEEK] TimingStream ptsDiff=%lld seekTimeCorrected(before)=%llu",
+             ptsDiff, seekTimeCorrected);
+
     if (ptsDiff < 0 && seekTimeCorrected + ptsDiff > seekTimeCorrected)
       seekTimeCorrected = 0;
     else
       seekTimeCorrected += ptsDiff;
+
+    LOG::Log(LOGINFO, "[ISASEEK] TimingStream seekTimeCorrected(after)=%llu", seekTimeCorrected);
   }
 
   // Note: At the end of the seek operations, you may notice on Kodi debug log "dropping packets" prints
@@ -1038,11 +1054,19 @@ bool SESSION::CSession::SeekTime(double seekTime, bool& isError)
   {
     ISampleReader* streamReader{stream->GetReader()};
     if (!streamReader)
+    {
+      LOG::Log(LOGINFO, "[ISASEEK] Stream type=%d SKIP: reader is null",
+               stream->m_info.GetStreamType());
       continue;
+    }
 
     streamReader->WaitReadSampleAsyncComplete();
     if (!stream->IsEnabled())
+    {
+      LOG::Log(LOGINFO, "[ISASEEK] Stream sid=%d type=%d SKIP: not enabled",
+               streamReader->GetStreamId(), stream->m_info.GetStreamType());
       continue;
+    }
 
     // With FMP4 audio stream included to video stream you must not seek with AdaptiveStream
     // segments are managed by AdaptiveStream of the video stream
@@ -1050,30 +1074,51 @@ bool SESSION::CSession::SeekTime(double seekTime, bool& isError)
     const bool hasAdStream = !(streamReader->GetType() == ISampleReader::Type::FMP4 &&
                                stream->m_adStream.getRepresentation()->IsIncludedStream());
 
+    LOG::Log(LOGINFO, "[ISASEEK] Stream sid=%d type=%d hasAdStream=%d isTimingStream=%d isIncluded=%d",
+             streamReader->GetStreamId(), stream->m_info.GetStreamType(), hasAdStream,
+             (m_timingStream == stream) ? 1 : 0,
+             stream->m_adStream.getRepresentation()->IsIncludedStream() ? 1 : 0);
+
     if (hasAdStream && m_timingStream != stream) // Do not "seek time" on "timing stream" already done above
     {
       const double seekSecs{static_cast<double>(seekTimeCorrected - ptsDiff) / STREAM_TIME_BASE};
 
       if (!SeekAdStream(*stream, seekSecs))
       {
+        LOG::Log(LOGINFO, "[ISASEEK] Stream sid=%d SeekAdStream FAIL seekSecs=%0.3f",
+                 streamReader->GetStreamId(), seekSecs);
         if (stream->m_info.GetStreamType() == INPUTSTREAM_TYPE_SUBTITLE)
           continue; // Subtitles failure should not block the seek operations
 
+        LOG::Log(LOGINFO, "[ISASEEK] SeekTime exit FAIL: SeekAdStream failed for non-subtitle");
         isError = true;
         return false;
       }
+      LOG::Log(LOGINFO, "[ISASEEK] Stream sid=%d SeekAdStream OK seekSecs=%0.3f",
+               streamReader->GetStreamId(), seekSecs);
     }
 
     if (!CheckReaderRunning(*stream))
+    {
+      LOG::Log(LOGINFO, "[ISASEEK] Stream sid=%d CheckReaderRunning FAIL isStarted=%d",
+               streamReader->GetStreamId(), streamReader->IsStarted());
+      LOG::Log(LOGINFO, "[ISASEEK] SeekTime exit FAIL: CheckReaderRunning");
       return false;
+    }
+
+    LOG::Log(LOGINFO, "[ISASEEK] Stream sid=%d type=%d TimeSeek(pts=%llu) calling...",
+             streamReader->GetStreamId(), stream->m_info.GetStreamType(), seekTimeCorrected);
 
     if (!streamReader->TimeSeek(seekTimeCorrected))
     {
+      LOG::Log(LOGINFO, "[ISASEEK] Stream sid=%d TimeSeek FAIL pts=%llu",
+               streamReader->GetStreamId(), seekTimeCorrected);
       streamReader->Reset(true);
 
       if (stream->m_info.GetStreamType() == INPUTSTREAM_TYPE_SUBTITLE)
         continue; // Subtitles failure should not block the seek operations
 
+      LOG::Log(LOGINFO, "[ISASEEK] SeekTime exit FAIL: TimeSeek failed for non-subtitle");
       isError = true;
       return false;
     }
@@ -1100,6 +1145,8 @@ bool SESSION::CSession::SeekTime(double seekTime, bool& isError)
       }
     }
   }
+  LOG::Log(LOGINFO, "[ISASEEK] SeekTime exit OK finalSeekTime=%0.3lf seekTimeCorrected=%llu",
+           seekTime, seekTimeCorrected);
   return true;
 }
 
