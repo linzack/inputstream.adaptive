@@ -224,7 +224,22 @@ bool CInputStreamAdaptive::OpenStream(int streamid)
   if (m_checkCoreReopen)
   {
     LOG::Log(LOGDEBUG, "OpenStream(%d): The stream has already been opened", streamid);
-    return false;
+
+    // If the reader is in EOS from a transient failure during STREAMCHANGE,
+    // reset it so audio can resume
+    auto reader = stream->GetReader();
+    bool isEos = reader && reader->EOS();
+    bool streamChanged = stream->m_adStream.StreamChanged();
+    
+    LOG::Log(LOGDEBUG, "OpenStream(%d): Checking recovery. isEos=%d streamChanged=%d", 
+             streamid, isEos, streamChanged);
+
+    if (isEos && !streamChanged)
+    {
+      LOG::Log(LOGINFO, "OpenStream(%d): Recovering stream from transient EOS", streamid);
+      reader->Reset(false); // Clear EOS
+    }
+    return true; // Tell Kodi Core the stream is still valid
   }
 
   CRepresentation* rep = stream->m_adStream.getRepresentation();
