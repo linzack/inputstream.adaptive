@@ -221,20 +221,19 @@ bool CInputStreamAdaptive::OpenStream(int streamid)
     }
   }
 
-  if (m_checkCoreReopen)
+  bool streamChanged{stream->m_adStream.StreamChanged()};
+  
+  if (m_checkCoreReopen && !streamChanged)
   {
-    LOG::Log(LOGDEBUG, "OpenStream(%d): The stream has already been opened", streamid);
-
     // If the reader is in EOS from a transient failure during STREAMCHANGE,
     // reset it so audio can resume
     auto reader = stream->GetReader();
-    bool isEos = reader && reader->EOS();
-    bool streamChanged = stream->m_adStream.StreamChanged();
+    bool isEos{reader && reader->EOS()};
     
-    LOG::Log(LOGDEBUG, "OpenStream(%d): Checking recovery. isEos=%d streamChanged=%d", 
+    LOG::Log(LOGDEBUG, "OpenStream(%d): The stream has already been opened. Checking recovery. isEos=%d streamChanged=%d", 
              streamid, isEos, streamChanged);
 
-    if (isEos && !streamChanged)
+    if (isEos)
     {
       LOG::Log(LOGINFO, "OpenStream(%d): Recovering stream from transient EOS", streamid);
       reader->Reset(false); // Clear EOS
